@@ -173,7 +173,7 @@
                                      CyclicBuffer, OR,
                                      LevelMatchFilter, PatternParser, 
                                      ErrorHandler,Rewrite, JNDIUtil,
-									 HardenedObjectInputStream"/>
+									 HardenedObjectInputStream, NTEventLogAppenderDllPath"/>
 
   <!-- ================================================================= -->
   <!-- Longer unit tests                                                 -->
@@ -476,6 +476,25 @@
       <classpath refid="tests.classpath"/>
       <formatter type="plain" usefile="false"/>
       <test name="org.apache.log4j.nt.NTEventLogAppenderTest" />
+    </junit>
+  </target>
+
+  <target name="NTEventLogAppenderDllPath" depends="build">
+    <!--  Off Windows there is no NTEventLogAppender DLL: point
+          log4j.nteventlog.dll.path at an existing JDK shared library so the
+          appender's static initializer loads it by absolute path.  -->
+    <condition property="log4j.nteventlog.dll.path"
+               value="${sun.boot.library.path}/libjaas_unix.so">
+      <not><isset property="is-windows"/></not>
+    </condition>
+    <junit printsummary="yes" fork="yes"
+        haltonfailure="${haltonfailure}" dir="${project.lib.home}">
+      <classpath refid="tests.classpath"/>
+      <syspropertyset>
+        <propertyref name="log4j.nteventlog.dll.path"/>
+      </syspropertyset>
+      <formatter type="plain" usefile="false"/>
+      <test name="org.apache.log4j.nt.NTEventLogAppenderDllPathTest" />
     </junit>
   </target>
 
