@@ -158,7 +158,7 @@
   <!-- ================================================================= -->
   <!-- Run all tests                                                     -->
   <!-- ================================================================= -->  
-  <target name="runAll" depends="regression, longUnit"/>
+  <target name="runAll" depends="runSelected"/>
 
   <!-- ================================================================= -->
   <!-- Tests multiple parts of log4j. These tests are much more fragile  -->
@@ -366,6 +366,8 @@
   </target>
 
   <target name="ErrorHandler" depends="build">
+    <!-- Same path as XMLLayout/PatternLayout/etc.; avoid stale lines from earlier targets. -->
+    <delete file="output/temp"/>
     <junit printsummary="yes" fork="yes" 
          haltonfailure="${haltonfailure}" dir="${basedir}">
       <classpath refid="tests.classpath"/>
@@ -557,8 +559,25 @@ Specify files to reformat with -Djalopy.files=PATTERN.
          classpath="${checkstyle.jar}"/>
         <checkstyle config="sun_checks.xml">
             <fileset dir="${tests.source.home}" includes="${checkstyle.files}"/>
-        </checkstyle>          
+        </checkstyle>
   </target>
+
+  <!-- ================================================================= -->
+  <!-- runAll entry point: runs the full suite (regression, longUnit)    -->
+  <!-- unless -Dtest.filter=<target> names a single test target above.   -->
+  <!-- ================================================================= -->
+  <target name="runSelected">
+    <condition property="runAll.target" value="${test.filter}" else="runFull">
+      <and>
+        <isset property="test.filter"/>
+        <not><equals arg1="${test.filter}" arg2=""/></not>
+      </and>
+    </condition>
+    <echo message="Running test target: ${runAll.target}"/>
+    <antcall target="${runAll.target}" inheritRefs="true"/>
+  </target>
+
+  <target name="runFull" depends="regression, longUnit"/>
 
   
 </project>

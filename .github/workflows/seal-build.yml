@@ -1,0 +1,61 @@
+name: seal-build
+
+# log4j 1.2.17 has no upstream GitHub Actions CI. This workflow runs the
+# project's own Maven build (pom.xml), whose test phase drives the Ant test
+# suite in tests/build.xml (target runAll) through maven-antrun-plugin.
+# Built on JDK 7 (maven:3-jdk-7) with -source/-target 1.4 from the pom.
+on:
+  workflow_dispatch:
+    inputs:
+      test-filter:
+        description: "Name of a single test target in tests/build.xml (e.g. Core, SocketServer); empty runs the full suite"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test (mvn verify)
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.m2"
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD":/workdir -v "$HOME/.m2":/root/.m2 -w /workdir \
+            maven:3-jdk-7 \
+            mvn -B clean verify -Dmaven.site.skip=true \
+              -Dtest.filter="${{ inputs.test-filter }}" 2>&1 | tee build.log
+
+      - name: Test summary
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import re
+          # The plain formatter prints "Testsuite: X" followed by its
+          # "Tests run:" line; printsummary repeats the count, so only the
+          # line right after each "Testsuite:" header is summed.
+          run = fail = err = suites = 0
+          pending = None
+          for line in open("build.log", errors="replace"):
+              s = re.search(r"Testsuite: (\S+)", line)
+              if s:
+                  pending = s.group(1)
+                  continue
+              m = re.search(r"Tests run: (\d+), Failures: (\d+), Errors: (\d+)", line)
+              if m and pending:
+                  print(f"{pending}: {line.split('Tests run:', 1)[1].strip()}")
+                  run += int(m.group(1)); fail += int(m.group(2)); err += int(m.group(3))
+                  suites += 1
+                  pending = None
+          print(f"Suites: {suites}")
+          print(f"TOTAL: Tests run: {run}, Passed: {run - fail - err}, Failures: {fail}, Errors: {err}")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: log4j-jar
+          path: target/log4j-1.2.17.jar
+          if-no-files-found: error
